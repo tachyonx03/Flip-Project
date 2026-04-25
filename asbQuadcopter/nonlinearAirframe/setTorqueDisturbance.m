@@ -15,7 +15,20 @@ modelName  = 'nonlinearAirframe';
 blockPath  = [modelName '/Nonlinear/tau_ext_zero'];
 
 if strcmp(type, 'off')
-    set_param(blockPath, 'Value', '[0;0;0]');
+    nonlinPath = [modelName '/Nonlinear'];
+    blockType = get_param(blockPath, 'BlockType');
+    if ~strcmp(blockType, 'Constant')
+        delete_line(nonlinPath, 'tau_ext_zero/1', 'AC model/6');
+        delete_block(blockPath);
+        add_block('simulink/Sources/Constant', ...
+            [nonlinPath '/tau_ext_zero'], ...
+            'Position', [140, 243, 200, 263], ...
+            'Value', '[0;0;0]');
+        add_line(nonlinPath, 'tau_ext_zero/1', 'AC model/6', 'autorouting','on');
+        save_system(modelName);
+    else
+        set_param(blockPath, 'Value', '[0;0;0]');
+    end
     fprintf('교란 OFF\n');
     return;
 end
