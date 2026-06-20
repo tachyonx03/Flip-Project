@@ -85,6 +85,12 @@ measurementTolerance = 0.01;
 % Add your variables here:
 % myvariable = 0;
 
+% Default zero external torque for the disturbance From Workspace block.
+if ~exist('tau_ext_ts', 'var')
+    tau_ext_ts = timeseries(zeros(2,3), [0; max(TFinal, 1000)]);
+    tau_ext_ts.Name = 'tau_ext_ts';
+end
+
 % Register variables after the project is loaded and store the variables in
 % initVars so they can be cleared later on the project shutdown.
 endVars = who;

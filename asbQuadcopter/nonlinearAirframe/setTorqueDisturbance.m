@@ -4,7 +4,9 @@
 % 사용법:
 %   setTorqueDisturbance('constant', 'roll', 0.002)
 %   setTorqueDisturbance('step',     'pitch', 0.001, 5, 10)
-%   setTorqueDisturbance('sine',     'roll',  0.001, 2)   % 2Hz
+%   setTorqueDisturbance('sine',     'roll',  0.001, 2)      % 2Hz
+%   setTorqueDisturbance('random',   'roll',  0.001)         % 가우시안
+%   setTorqueDisturbance('random',   'roll',  0.001, 10)     % seed 지정
 %   setTorqueDisturbance('off')
 %
 % Copyright 2024
@@ -43,12 +45,25 @@ end
 
 switch lower(type)
     case 'constant'
-        % 상수 토크
+        % 상수 토크 — From Workspace 블록이 남아있을 경우 Constant로 교체
+        nonlinPath = [modelName '/Nonlinear'];
+        blockType  = get_param(blockPath, 'BlockType');
+        if ~strcmp(blockType, 'Constant')
+            delete_line(nonlinPath, 'tau_ext_zero/1', 'AC model/6');
+            delete_block(blockPath);
+            add_block('simulink/Sources/Constant', ...
+                [nonlinPath '/tau_ext_zero'], ...
+                'Position',       [140, 243, 200, 263], ...
+                'Value',          '[0;0;0]',             ...
+                'OutDataTypeStr', 'double');
+            add_line(nonlinPath, 'tau_ext_zero/1', 'AC model/6', 'autorouting', 'on');
+        end
         val = sprintf('[%f;%f;%f]', ...
             magnitude*(strcmp(axis,'roll')), ...
             magnitude*(strcmp(axis,'pitch')), ...
             magnitude*(strcmp(axis,'yaw')));
         set_param(blockPath, 'Value', val);
+        save_system(modelName);
         fprintf('교란 설정: %s축 %.4f N*m 상수\n', axName, magnitude);
 
     case 'step'
@@ -74,8 +89,11 @@ switch lower(type)
 
         % Constant 블록을 From Workspace 블록으로 교체
         nonlinPath = [modelName '/Nonlinear'];
-        delete_line(nonlinPath, 'tau_ext_zero/1', 'AC model/6');
-        delete_block(blockPath);
+        try
+            delete_line(nonlinPath, 'tau_ext_zero/1', 'AC model/6');
+            delete_block(blockPath);
+        catch
+        end
 
         add_block('simulink/Sources/From Workspace', ...
             [nonlinPath '/tau_ext_zero'], ...
@@ -122,7 +140,50 @@ switch lower(type)
         save_system(modelName);
         fprintf('교란 설정: %s축 %.4f N*m, %.1fHz 정현파\n', axName, magnitude, freq);
 
+    case 'random'
+        % 대역제한 가우시안 노이즈 (5Hz LPF — 실제 바람 스펙트럼 모사)
+        % varargin{1} = seed (선택), varargin{2} = cutoff Hz (기본 5Hz)
+        if numel(varargin) >= 1
+            rng(varargin{1});
+        end
+        cutoff_hz = 5;
+        if numel(varargin) >= 2
+            cutoff_hz = varargin{2};
+        end
+        dt  = 1e-3;
+        t   = (0:dt:60)';
+        raw = magnitude * randn(size(t));
+        % 1차 버터워스 LPF 적용
+        fc  = cutoff_hz / (1/(2*dt));
+        [b_f, a_f] = butter(1, fc);
+        mag = filtfilt(b_f, a_f, raw);
+
+        switch lower(axis)
+            case 'roll',  ts = timeseries([mag, zeros(size(t)), zeros(size(t))], t);
+            case 'pitch', ts = timeseries([zeros(size(t)), mag, zeros(size(t))], t);
+            case 'yaw',   ts = timeseries([zeros(size(t)), zeros(size(t)), mag], t);
+        end
+        ts.Name = 'tau_ext_ts';
+        assignin('base', 'tau_ext_ts', ts);
+
+        nonlinPath = [modelName '/Nonlinear'];
+        try
+            delete_line(nonlinPath, 'tau_ext_zero/1', 'AC model/6');
+            delete_block(blockPath);
+        catch
+        end
+
+        add_block('simulink/Sources/From Workspace', ...
+            [nonlinPath '/tau_ext_zero'], ...
+            'Position',       [140, 243, 200, 263], ...
+            'VariableName',   'tau_ext_ts',         ...
+            'OutDataTypeStr', 'double',              ...
+            'Interpolate',    'on');
+        add_line(nonlinPath, 'tau_ext_zero/1', 'AC model/6', 'autorouting', 'on');
+        save_system(modelName);
+        fprintf('교란 설정: %s축 %.4f N*m 가우시안 노이즈\n', axName, magnitude);
+
     otherwise
-        error('type은 constant/step/sine/off 중 하나');
+        error('type은 constant/step/sine/random/off 중 하나');
 end
 end
