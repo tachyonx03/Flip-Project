@@ -31,6 +31,14 @@ MathWorks의 `asbQuadcopter`(Parrot Mambo) 예제를 SO(3) 자세 동역학 기�
 
 시트 `data`에 시간에 따른 명령을 입력합니다. 컬럼은 `time`, `X`, `Y`, `Z`, `Yaw`, `Pitch`, `Roll` 순서이며, 각각 시간과 위치(X, Y, Z), 자세(Yaw, Pitch, Roll) 레퍼런스를 의미합니다. 위치 명령 유무에 따라 위치제어와 자세제어 모드가 자동으로 전환됩니다.
 
+## 명령 타입
+
+- VSS_COMMAND = 0;  % signal editor
+- VSS_COMMAND = 1;  % Joystick + signal editor
+- VSS_COMMAND = 2;  % matfile 명령
+- VSS_COMMAND = 3;  % xlsx 스프레드시트 명령
+
+
 ## 모델 구성
 
 - `asbQuadcopter` — 최상위 모델 (명령·제어·기체·시각화 통합)
