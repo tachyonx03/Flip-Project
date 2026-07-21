@@ -4,3 +4,7 @@ slprj/
 *.mexa64
 *.asv
 *.autosave
+
+# --- 로컬 백업 (커밋 제외) ---
+_flip_backup_*/
+cmdData_backup_*.xlsx
