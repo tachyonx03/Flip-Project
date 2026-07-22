@@ -24,7 +24,7 @@ Estimator.complementaryFilterInit = single([0 0 0]);
 %KF
 Estimator.alt.kf.G = [0;1];
 Estimator.alt.kf.H = 0;
-Estimator.alt.kf.Q = 0.0005;
+Estimator.alt.kf.Q = 0.05;   % raised from 5e-4: faster KF -> low-lag velocity estimate so D_z altitude damping is effective (kills the ~16s limit cycle)
 Estimator.alt.kf.R = [0.1];
 Estimator.alt.kf.N = 0;
 
