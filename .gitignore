@@ -5,6 +5,6 @@ slprj/
 *.asv
 *.autosave
 
-# Claude Code MCP config + agentic-toolkit skills (machine-specific absolute paths)
-.mcp.json
-.claude/skills/
+# --- 로컬 백업 (커밋 제외) ---
+_flip_backup_*/
+cmdData_backup_*.xlsx
