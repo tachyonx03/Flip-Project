@@ -15,7 +15,12 @@ Estimator.gyroAngleUpdateAccThreshold = 0.002;
 Estimator.gyroAngleUpdateAccWeight = 0.001;
 Estimator.gyroAngleUpdateVisWeight = 0.2;
 Estimator.gyroscopeSensitivity = 1;
-Estimator.complementaryFilterInit = single([0 0 0]);
+Estimator.complementaryFilterInit = single([1 0 0 0]);
+
+Estimator.ParamGravCorrCoeff = 0.001;
+Estimator.ParamGyroBiasUpdate = 0.001;
+Estimator.SpinRateThres = 0.175;
+Estimator.GyroBiasMax = 0.001;
 
 %Altitude
 [Estimator.alt.filterPrsNum,Estimator.alt.filterPrsDen] = butter(3,0.01);

@@ -4,3 +4,7 @@ slprj/
 *.mexa64
 *.asv
 *.autosave
+
+# Claude Code MCP config + agentic-toolkit skills (machine-specific absolute paths)
+.mcp.json
+.claude/skills/
