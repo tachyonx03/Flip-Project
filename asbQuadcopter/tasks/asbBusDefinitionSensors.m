@@ -1092,8 +1092,8 @@ elems(3).DocUnits = '';
 elems(3).Description = '';
 
 elems(4) = Simulink.BusElement;
-elems(4).Name = 'yaw';
-elems(4).Dimensions = 1;
+elems(4).Name = 'R';
+elems(4).Dimensions = [3 3];
 elems(4).DimensionsMode = 'Fixed';
 elems(4).DataType = 'single';
 elems(4).SampleTime = -1;
@@ -1105,7 +1105,7 @@ elems(4).DocUnits = '';
 elems(4).Description = '';
 
 elems(5) = Simulink.BusElement;
-elems(5).Name = 'pitch';
+elems(5).Name = 'dx';
 elems(5).Dimensions = 1;
 elems(5).DimensionsMode = 'Fixed';
 elems(5).DataType = 'single';
@@ -1118,7 +1118,7 @@ elems(5).DocUnits = '';
 elems(5).Description = '';
 
 elems(6) = Simulink.BusElement;
-elems(6).Name = 'roll';
+elems(6).Name = 'dy';
 elems(6).Dimensions = 1;
 elems(6).DimensionsMode = 'Fixed';
 elems(6).DataType = 'single';
@@ -1131,7 +1131,7 @@ elems(6).DocUnits = '';
 elems(6).Description = '';
 
 elems(7) = Simulink.BusElement;
-elems(7).Name = 'dx';
+elems(7).Name = 'dz';
 elems(7).Dimensions = 1;
 elems(7).DimensionsMode = 'Fixed';
 elems(7).DataType = 'single';
@@ -1144,7 +1144,7 @@ elems(7).DocUnits = '';
 elems(7).Description = '';
 
 elems(8) = Simulink.BusElement;
-elems(8).Name = 'dy';
+elems(8).Name = 'p';
 elems(8).Dimensions = 1;
 elems(8).DimensionsMode = 'Fixed';
 elems(8).DataType = 'single';
@@ -1157,7 +1157,7 @@ elems(8).DocUnits = '';
 elems(8).Description = '';
 
 elems(9) = Simulink.BusElement;
-elems(9).Name = 'dz';
+elems(9).Name = 'q';
 elems(9).Dimensions = 1;
 elems(9).DimensionsMode = 'Fixed';
 elems(9).DataType = 'single';
@@ -1170,7 +1170,7 @@ elems(9).DocUnits = '';
 elems(9).Description = '';
 
 elems(10) = Simulink.BusElement;
-elems(10).Name = 'p';
+elems(10).Name = 'r';
 elems(10).Dimensions = 1;
 elems(10).DimensionsMode = 'Fixed';
 elems(10).DataType = 'single';
@@ -1181,32 +1181,6 @@ elems(10).Min = [];
 elems(10).Max = [];
 elems(10).DocUnits = '';
 elems(10).Description = '';
-
-elems(11) = Simulink.BusElement;
-elems(11).Name = 'q';
-elems(11).Dimensions = 1;
-elems(11).DimensionsMode = 'Fixed';
-elems(11).DataType = 'single';
-elems(11).SampleTime = -1;
-elems(11).Complexity = 'real';
-elems(11).SamplingMode = 'Sample based';
-elems(11).Min = [];
-elems(11).Max = [];
-elems(11).DocUnits = '';
-elems(11).Description = '';
-
-elems(12) = Simulink.BusElement;
-elems(12).Name = 'r';
-elems(12).Dimensions = 1;
-elems(12).DimensionsMode = 'Fixed';
-elems(12).DataType = 'single';
-elems(12).SampleTime = -1;
-elems(12).Complexity = 'real';
-elems(12).SamplingMode = 'Sample based';
-elems(12).Min = [];
-elems(12).Max = [];
-elems(12).DocUnits = '';
-elems(12).Description = '';
 
 states_estim = Simulink.Bus;
 states_estim.HeaderFile = '';
