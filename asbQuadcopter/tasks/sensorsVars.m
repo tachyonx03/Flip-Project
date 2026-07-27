@@ -26,7 +26,10 @@ Sensors.IMU.gyroDamping = 0.707;
 Sensors.IMU.gyroScaleCross = diag(Sensors.IMUGyroGain);
 Sensors.IMU.gyroBias = sensorCalibrationData(4:6);
 Sensors.IMU.gyroGBias = [0 0 0];
-Sensors.IMU.gyroLimits = [-10 -10 -10 10 10 10];
+% MPU-6050 (Parrot Mambo 실제 IMU) 자이로 최대 설정 = +-2000 deg/s = +-34.907 rad/s
+% 선택 가능 범위: +-250 / +-500 / +-1000 / +-2000 deg/s (FS_SEL 레지스터)
+%   = +-4.363 / +-8.727 / +-17.453 / +-34.907 rad/s
+Sensors.IMU.gyroLimits = [-34.907 -34.907 -34.907 34.907 34.907 34.907];
 % Noise
 Sensors.IMU.noiseSeeds = 41*ones(6,1);
 Sensors.IMU.noiseWeights = [0.8 0.8 0.8 0.025 0.025 0.025];
