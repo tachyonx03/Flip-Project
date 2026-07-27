@@ -46,6 +46,21 @@ init.posAirportActor = [3900, 1, 0]; % initial position of the Simulation 3D Act
 init.posAppleHill = [-50 70 -0.2]; % initial position of quadcopter in Apple Hill scene
 init.posAppleHillActor = [-50 72 0.197]; % initial position of the Simulation 3D Actor (red box) in Apple Hill scene
 
+% Plant initial state (read by SO3_dynamics in nonlinearAirframe/Nonlinear).
+% Defaults reproduce the previous hard-coded behaviour: level, at rest, on the pad.
+% Scenario scripts / the start-up UI overwrite these before running.
+init_Cbe = eye(3);              % initial attitude, DCM_be (NED -> body)
+init_W   = zeros(3,1);          % initial body angular rate [rad/s]
+init_xN  = [57; 95; -0.046];    % initial NED position [m]
+init_vN  = zeros(3,1);          % initial NED velocity [m/s]
+
+% Impact disturbance (read by ImpactGen in nonlinearAirframe/Nonlinear).
+% Zero force = no impact, so the model behaves exactly as before by default.
+impact_t0  = 5;                 % time the hit lands [s]
+impact_dur = 0.03;              % contact duration [s], keep >= a few steps of Ts
+impact_F   = zeros(3,1);        % force during contact, BODY frame [N]
+impact_r   = zeros(3,1);        % hit point w.r.t. CG, BODY frame [m]; torque = r x F
+
 % Initialize States:
 States = Simulink.Bus.createMATLABStruct('StatesBus');
 States.V_body = init.vb';
