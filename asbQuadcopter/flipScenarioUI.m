@@ -125,22 +125,25 @@ showScenario('impact');
     function buildAttitudePanel(parent)
         ui.pAtt = uipanel(parent, 'Title','② 초기 자세 설정', 'FontWeight','bold', 'Visible','off');
         ui.pAtt.Layout.Row = 1; ui.pAtt.Layout.Column = 1;
-        g = uigridlayout(ui.pAtt, [6 2]);
+        g = uigridlayout(ui.pAtt, [7 2]);
         g.ColumnWidth = {150, '1x'};
-        g.RowHeight = repmat({32}, 1, 6);
+        g.RowHeight = repmat({32}, 1, 7);
 
         ui.attTilt = addSlider(g, 1, '초기 기울기 [deg]', [0 180], 120, '%.0f', @() updateAdvice());
         ui.attAz   = addSlider(g, 2, '기울기 방향 [deg]', [0 360], 0, '%.0f');
         ui.attAlt  = addSlider(g, 3, '방출 고도 [m]', [2 25], 10, '%.1f', @() updateAdvice());
         ui.attSpin = addSlider(g, 4, '초기 회전 [deg/s]', [0 600], 0, '%.0f');
+        ui.attHold = addSlider(g, 5, '모터 정지 시간 [s]', [0 1.5], 0, '%.2f');
 
         ui.advice = uilabel(g, 'Text','', 'FontSize',12, 'FontWeight','bold');
-        ui.advice.Layout.Row = 5; ui.advice.Layout.Column = [1 2];
+        ui.advice.Layout.Row = 6; ui.advice.Layout.Column = [1 2];
 
-        hint = uilabel(g, 'Text', sprintf(['· 자세 회복 자체는 빠르다. 진짜 문제는 회복하는 동안 잃는 고도.\n' ...
-            '· 8 m 에서 놓으면 170도까지는 살고, 180도는 땅에 닿는다.']), ...
+        hint = uilabel(g, 'Text', sprintf([ ...
+            '· 모터 정지 시간 동안은 아이들 추력만 나가므로 사실상 자유낙하한다.\n' ...
+            '  0 이면 컨트롤러가 t=0 부터 바로 싸운다 (기울기가 0.1초면 잡힌다).\n' ...
+            '· 자세 회복 자체는 빠르다. 진짜 문제는 회복하는 동안 잃는 고도.']), ...
             'FontSize',11, 'FontColor',[0.35 0.35 0.35]);
-        hint.Layout.Row = 6; hint.Layout.Column = [1 2];
+        hint.Layout.Row = 7; hint.Layout.Column = [1 2];
         updateAdvice();
     end
 
@@ -254,6 +257,7 @@ showScenario('impact');
             cfg.Cbe = eye(3);
             cfg.W   = zeros(3,1);
             cfg.xN  = [57; 95; -0.046];
+            cfg.hold = 0;                           % motors live: it has to hover to be hit
             cfg.stopTime = max(20, cfg.t0 + 10);
             cfg.evalFrom = cfg.t0;
         else
@@ -268,6 +272,7 @@ showScenario('impact');
             cfg.F   = zeros(3,1);
             cfg.r   = zeros(3,1);
             cfg.dur = 0.03; cfg.t0 = 1e6;           % no impact
+            cfg.hold = ui.attHold.Value;            % motors dead for this long
             cfg.tilt0 = tilt; cfg.alt0 = alt;
             cfg.stopTime = 25;
             cfg.evalFrom = 0;
@@ -284,6 +289,7 @@ showScenario('impact');
         assignin('base','impact_dur', cfg.dur);
         assignin('base','impact_F',   cfg.F);
         assignin('base','impact_r',   cfg.r);
+        assignin('base','release_delay', cfg.hold);
         assignin('base','g', 9.81);
 
         % --- silence anything that would fight the scenario, then restore ---
@@ -408,7 +414,8 @@ showScenario('impact');
                 cfg.J, cfg.dur*1000, cfg.t0);
             lines{end+1} = sprintf('타격점: r = [%.1f, %.1f, %.1f] cm (몸체)', cfg.r*100);
         else
-            lines{end+1} = sprintf('초기  : 기울기 %.0f°,  방출 고도 %.1f m', cfg.tilt0, cfg.alt0);
+            lines{end+1} = sprintf('초기  : 기울기 %.0f°,  방출 고도 %.1f m,  모터 정지 %.2f s', ...
+                cfg.tilt0, cfg.alt0, cfg.hold);
         end
         lines{end+1} = sprintf('최대 기울기 : %.1f°', res.maxTilt);
         if isnan(res.settle)

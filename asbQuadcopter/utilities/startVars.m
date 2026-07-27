@@ -61,6 +61,11 @@ impact_dur = 0.03;              % contact duration [s], keep >= a few steps of T
 impact_F   = zeros(3,1);        % force during contact, BODY frame [N]
 impact_r   = zeros(3,1);        % hit point w.r.t. CG, BODY frame [m]; torque = r x F
 
+% Motor hold-off (read by MotorGate in nonlinearAirframe/Nonlinear).
+% The motors stay dead until this time, so the drone genuinely free-falls
+% before the controller is allowed to fight back. 0 = motors live from t=0.
+release_delay = 0;              % [s]
+
 % Initialize States:
 States = Simulink.Bus.createMATLABStruct('StatesBus');
 States.V_body = init.vb';
