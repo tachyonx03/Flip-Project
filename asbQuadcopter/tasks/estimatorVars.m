@@ -11,13 +11,13 @@ Estimator.IMU.filterAccel = designfilt('lowpassfir', 'FilterOrder',5, ...
     'CutoffFrequency', 0.1);
 [Estimator.IMU.filterGyroNum,Estimator.IMU.filterGyroDen] = cheby2(5,40,0.8);
 
-Estimator.gyroAngleUpdateAccThreshold = 0.002;
+Estimator.gyroAngleUpdateAccThreshold = 0.05;
 Estimator.gyroAngleUpdateAccWeight = 0.001;
 Estimator.gyroAngleUpdateVisWeight = 0.2;
 Estimator.gyroscopeSensitivity = 1;
 Estimator.complementaryFilterInit = single([1 0 0 0]);
 
-Estimator.ParamGravCorrCoeff = 0.001;
+Estimator.ParamGravCorrCoeff = 0.2;
 Estimator.ParamGyroBiasUpdate = 0.001;
 Estimator.SpinRateThres = 0.175;
 Estimator.GyroBiasMax = 0.001;
