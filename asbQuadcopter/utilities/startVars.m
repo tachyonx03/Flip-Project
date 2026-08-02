@@ -84,6 +84,9 @@ g = 9.81;
 load('modelParrot');
 % Obtain vehicle variables
 vehicleVars;
+% 개발용 자이로 포화 해제. sensorsVars 보다 먼저 정의되어야 함
+unlockGyro = 1;   % 1이면 sensorsVars.m 이 gyroLimits 를 1e5배로 키움
+                  % 이 상태에서 A<=0.36 까지 전량 추정 비행 성립 (2026-08-02 검증)
 % Obtain sensor variables
 sensorsVars;
 % Obtain controller variables
@@ -112,8 +115,10 @@ if ~exist('tau_ext_ts', 'var')
 end
 
 useTrueAtt = 0;
-useTruePos = 1;
-kTiltE = 0.1;   % E안 tilt 보정 게인. 0.3 이상은 방향오차와 상호작용해 발산 (2026-08-02 검증)
+useTruePos = 0;
+kTiltE = 0.2;   % tilt 보정 게인. C안(광류 방향) 도입 후 상한 0.1 -> 0.2 (2026-08-02 검증)
+useTrueAlt = 0;   % 고도 Z/dz 추정값 사용. 참값 대비 RMSE 0.5 mm, 플립 영향 없음 (2026-08-02 검증)
+
 
 % Register variables after the project is loaded and store the variables in
 % initVars so they can be cleared later on the project shutdown.

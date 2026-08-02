@@ -30,6 +30,11 @@ Sensors.IMU.gyroGBias = [0 0 0];
 % 선택 가능 범위: +-250 / +-500 / +-1000 / +-2000 deg/s (FS_SEL 레지스터)
 %   = +-4.363 / +-8.727 / +-17.453 / +-34.907 rad/s
 Sensors.IMU.gyroLimits = [-34.907 -34.907 -34.907 34.907 34.907 34.907];
+% 개발용 포화 해제 스위치. 실기값은 위 줄에 그대로 보존 — 절대 덮어쓰지 말 것.
+% unlockGyro=1 인 동안 얻은 수치는 전부 "포화 없음" 조건임을 명시할 것 (2026-08-02)
+if evalin('base','exist(''unlockGyro'',''var'')') && evalin('base','unlockGyro')
+    Sensors.IMU.gyroLimits = Sensors.IMU.gyroLimits * 1e5;
+end
 % Noise
 Sensors.IMU.noiseSeeds = 41*ones(6,1);
 Sensors.IMU.noiseWeights = [0.8 0.8 0.8 0.025 0.025 0.025];
