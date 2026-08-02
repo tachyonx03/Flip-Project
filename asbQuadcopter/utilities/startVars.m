@@ -111,6 +111,10 @@ if ~exist('tau_ext_ts', 'var')
     tau_ext_ts.Name = 'tau_ext_ts';
 end
 
+useTrueAtt = 0;
+useTruePos = 1;
+kTiltE = 0.1;   % E안 tilt 보정 게인. 0.3 이상은 방향오차와 상호작용해 발산 (2026-08-02 검증)
+
 % Register variables after the project is loaded and store the variables in
 % initVars so they can be cleared later on the project shutdown.
 endVars = who;
