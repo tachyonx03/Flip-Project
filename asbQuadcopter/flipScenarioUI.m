@@ -8,19 +8,30 @@ function flipScenarioUI()
 %     2) Attitude - release the drone at altitude already tilted, and let it
 %                  recover, re-hover, and fly back to its station.
 %
-%   Both drive the hooks added to nonlinearAirframe (ImpactGen and the
-%   init_* plant state) and leave the model exactly as they found it.
+%   Both drive the hooks in nonlinearAirframe (ImpactGen, MotorGate and the
+%   init_* plant state) and leave the model, and the workspace, exactly as
+%   they found them.
+%
+%   The hooks were deleted from the airframe in dd12f10, so if they are
+%   missing this screen says so and points at restoreScenarioHooks('apply')
+%   instead of quietly flying a plain hover and calling it a success.
 %
 %   Usage:  open the Quadcopter project, then run  flipScenarioUI
+%
+%   See also RESTORESCENARIOHOOKS.
 
 MODEL   = 'asbQuadcopter';
+AIRFR   = 'nonlinearAirframe';
+ESTIM   = 'stateEstimator';
 ARM     = 0.0624;      % Vehicle.Airframe.d - distance from CG to a motor [m]
 HOVER_Z = 3.0;         % altitude the command profile parks at [m]
+                       % (cmdData_hover3m.xlsx ramps to -3 m by t = 4 s and holds)
 
 ui = struct();
 ui.latching = false;
 buildFigure();
 showScenario('impact');
+reportReadiness();
 
 % ======================================================================
 %  Layout
@@ -214,23 +225,72 @@ showScenario('impact');
     end
 
 % ======================================================================
+%  Readiness - the airframe hooks have to be there for any of this to mean
+%  anything. Without them the model still runs; it just flies a plain hover
+%  and every scenario scores a meaningless "성공".
+% ======================================================================
+    function reportReadiness()
+        try
+            st = restoreScenarioHooks('check');
+        catch err
+            setStatus(['훅 점검 실패: ' err.message], [0.75 0.15 0.10]);
+            return;
+        end
+        if st.allReady
+            setStatus(sprintf('준비 완료 — %s', gyroRegime()), [0.35 0.35 0.35]);
+        else
+            ui.runBtn.Enable = 'off';
+            missing = {};
+            if ~st.impact,    missing{end+1} = '타격'; end
+            if ~st.motorGate, missing{end+1} = '모터 정지'; end
+            if ~st.initState, missing{end+1} = '초기 자세'; end
+            setStatus(sprintf('훅 없음(%s) — restoreScenarioHooks(''apply'') 먼저 실행', ...
+                strjoin(missing,', ')), [0.75 0.15 0.10]);
+            ui.scoreTxt.Text = sprintf([ ...
+                'nonlinearAirframe 에 시나리오 훅이 없습니다 (커밋 dd12f10 에서 삭제됨).\n' ...
+                '이 상태로 실행하면 외란이 하나도 없는 호버만 돌아 결과가 무의미합니다.\n\n' ...
+                'MATLAB 명령창에서 한 번만 실행하세요:\n' ...
+                '    restoreScenarioHooks(''apply'')\n\n' ...
+                '그 뒤 이 창을 닫고 flipScenarioUI 를 다시 여세요.']);
+            ui.verdict.Text = '';
+        end
+    end
+
+    function s = gyroRegime()
+        % unlockGyro=1 이면 자이로 포화가 풀린 상태라 결과 해석이 달라진다.
+        try
+            lim = max(evalin('base','Sensors.IMU.gyroLimits'));
+        catch
+            s = '자이로 설정 미확인'; return;
+        end
+        if lim > 100
+            s = sprintf('자이로 포화 해제됨 (±%.0f rad/s, unlockGyro=1)', lim);
+        else
+            s = sprintf('자이로 실기값 (±%.1f rad/s)', lim);
+        end
+    end
+
+    function setStatus(txt, col)
+        ui.status.Text = txt;
+        ui.status.FontColor = col;
+        drawnow;
+    end
+
+% ======================================================================
 %  Run
 % ======================================================================
     function onRun()
         ui.runBtn.Enable = 'off';
-        ui.status.Text = '실행 중...';
-        ui.status.FontColor = [0.10 0.35 0.70];
-        drawnow;
+        setStatus('실행 중...', [0.10 0.35 0.70]);
         cleanupObj = onCleanup(@() set(ui.runBtn,'Enable','on'));
         try
             cfg = gatherConfig();
             res = runScenario(cfg);
             drawResults(cfg, res);
-            ui.status.Text = sprintf('완료 (%.1f 초 시뮬)', cfg.stopTime);
-            ui.status.FontColor = [0.35 0.35 0.35];
+            setStatus(sprintf('완료 (%.1f 초 시뮬) — %s', cfg.stopTime, gyroRegime()), ...
+                [0.35 0.35 0.35]);
         catch err
-            ui.status.Text = ['오류: ' err.message];
-            ui.status.FontColor = [0.75 0.15 0.10];
+            setStatus(['오류: ' err.message], [0.75 0.15 0.10]);
             rethrow(err);
         end
     end
@@ -280,51 +340,73 @@ showScenario('impact');
     end
 
     function res = runScenario(cfg)
-        % --- push parameters ---
-        assignin('base','init_Cbe', cfg.Cbe);
-        assignin('base','init_W',   cfg.W);
-        assignin('base','init_xN',  cfg.xN);
-        assignin('base','init_vN',  zeros(3,1));
-        assignin('base','impact_t0',  cfg.t0);
-        assignin('base','impact_dur', cfg.dur);
-        assignin('base','impact_F',   cfg.F);
-        assignin('base','impact_r',   cfg.r);
-        assignin('base','release_delay', cfg.hold);
+        load_system(MODEL); load_system(AIRFR);
+
+        % --- push scenario parameters, remembering what was there ---
+        names = {'init_Cbe','init_W','init_xN','init_vN', ...
+                 'impact_t0','impact_dur','impact_F','impact_r','release_delay'};
+        vals  = {cfg.Cbe, cfg.W, cfg.xN, zeros(3,1), ...
+                 cfg.t0, cfg.dur, cfg.F, cfg.r, cfg.hold};
+        prior = struct('name',{},'value',{},'existed',{});
+        for k = 1:numel(names)
+            prior(k).name    = names{k};
+            prior(k).existed = evalin('base', sprintf('exist(''%s'',''var'')==1', names{k}));
+            if prior(k).existed
+                prior(k).value = evalin('base', names{k});
+            end
+            assignin('base', names{k}, vals{k});
+        end
+        restoreWs = onCleanup(@() restoreWorkspace(prior));   %#ok<NASGU>
         assignin('base','g', 9.81);
 
         % --- silence anything that would fight the scenario, then restore ---
-        NL = 'nonlinearAirframe/Nonlinear';
+        NL = [AIRFR '/Nonlinear'];
         sA = [NL '/Step']; sB = [NL '/Step1'];
         saved.A  = get_param(sA,'After');
         saved.B  = get_param(sB,'After');
         saved.sf = get_param(MODEL,'StopFcn');
         saved.st = get_param(MODEL,'StopTime');
         saved.sl = get_param(MODEL,'SignalLogging');
-        restore = onCleanup(@() restoreModel(sA, sB, saved));
+        saved.pc = get_param(MODEL,'EnablePacing');
+        restore = onCleanup(@() restoreModel(sA, sB, saved));  %#ok<NASGU>
         set_param(sA,'After','[0 0 0]');
         set_param(sB,'After','[0 0 0]');
         set_param(MODEL,'StopFcn','');
         set_param(MODEL,'StopTime', num2str(cfg.stopTime));
         set_param(MODEL,'SignalLogging','on','SignalLoggingName','logsout');
+        set_param(MODEL,'EnablePacing','off');   % otherwise a 25 s run takes 25 s
 
         gatePort = markSonarGate();                 % [] if the gate block is absent
+        unmark   = onCleanup(@() unmarkSonarGate(gatePort));   %#ok<NASGU>
 
         out = sim(MODEL, 'ReturnWorkspaceOutputs','on');
 
-        if ~isempty(gatePort), set_param(gatePort,'DataLogging','off'); end
-
         % --- extract ---
-        lo = out.get('logsout');
-        St = lo.getElement('States').Values;
-        res.t   = St.X_ned.Time;
-        res.X   = squeeze(St.X_ned.Data(1,1,:));
-        res.Y   = squeeze(St.X_ned.Data(2,1,:));
-        res.Z   = -squeeze(St.X_ned.Data(3,1,:));
-        res.tilt = acosd(min(max(squeeze(St.DCM_be.Data(3,3,:)), -1), 1));
-        res.gate = [];
+        % States comes from the log_states To Workspace block, the same source
+        % every other script here uses. It is NOT in logsout: no signal in the
+        % top model is marked for logging, so logsout only ever holds what
+        % markSonarGate turns on below.
+        ls = out.log_states;
+        res.t = ls.X_ned.Time;
+        X = asNx3(ls.X_ned.Data);
+        res.X = X(:,1);
+        res.Y = X(:,2);
+        res.Z = -X(:,3);
+        R33 = squeeze(double(ls.DCM_be.Data(3,3,:)));
+        res.tilt = acosd(min(max(R33, -1), 1));
+
+        % --- sonar validity window ---
+        % Reproduce the estimator's own test from the true states, so the panel
+        % works whether or not the estimator signal happens to be logged:
+        %   slant = min(alt / max(R33, 0.087), 5)      flightControlSystem/SonarTilt_Distort
+        %   valid = R33 > cos(45 deg) and 0.44 <= slant <= 5   .../SonarRangeCheck
+        slant = min(res.Z ./ max(R33, 0.087), 5);
+        res.gate    = double((R33 > 0.7071) & (slant >= 0.44) & (slant <= 5.0));
+        res.gateSrc = '참값으로 재현';
         try
-            gv = lo.getElement('meas_valid').Values;
-            res.gate = interp1(gv.Time, double(squeeze(gv.Data)), res.t, 'previous','extrap');
+            gv = out.get('logsout').getElement('meas_valid').Values;
+            res.gate    = interp1(gv.Time, double(squeeze(gv.Data)), res.t, 'previous','extrap');
+            res.gateSrc = '추정기 실측';
         catch
         end
 
@@ -351,9 +433,32 @@ showScenario('impact');
             res.settle = res.t(iPeak - 1 + rest) - res.t(iPeak);
         end
 
-        if isempty(res.gate), res.gateFrac = NaN; else, res.gateFrac = mean(res.gate); end
+        res.gateFrac = mean(res.gate);
 
         res.success = ~res.crashed && res.endTilt < 10 && res.errXY < 1.0 && abs(res.errZ) < 0.5;
+    end
+
+    function M = asNx3(D)
+        % log_states hands a 3-vector back as N-by-3 or as 3-by-1-by-N
+        % depending on the signal; normalise to N-by-3.
+        D = double(D);
+        if ndims(D) == 3
+            M = squeeze(D).';
+        elseif size(D,1) == 3 && size(D,2) ~= 3
+            M = D.';
+        else
+            M = D;
+        end
+    end
+
+    function restoreWorkspace(prior)
+        for k = 1:numel(prior)
+            if prior(k).existed
+                assignin('base', prior(k).name, prior(k).value);
+            else
+                evalin('base', sprintf('clear %s', prior(k).name));
+            end
+        end
     end
 
     function restoreModel(sA, sB, saved)
@@ -362,18 +467,28 @@ showScenario('impact');
         set_param(MODEL,'StopFcn',saved.sf);
         set_param(MODEL,'StopTime',saved.st);
         set_param(MODEL,'SignalLogging',saved.sl);
+        set_param(MODEL,'EnablePacing',saved.pc);
     end
 
     function port = markSonarGate()
         port = [];
         try
-            ea = 'stateEstimator/State Estimator/EstimatorAltitude';
+            load_system(ESTIM);
+            ea = [ESTIM '/State Estimator/EstimatorAltitude'];
             ph = get_param([ea '/SonarRangeCheck'],'PortHandles');
             port = ph.Outport(2);
             set_param(port,'DataLogging','on', ...
                 'DataLoggingNameMode','Custom','DataLoggingName','meas_valid');
         catch
             port = [];
+        end
+    end
+
+    function unmarkSonarGate(port)
+        if isempty(port), return; end
+        try
+            set_param(port,'DataLogging','off');
+        catch
         end
     end
 
@@ -400,13 +515,9 @@ showScenario('impact');
         legend(ui.axXY, {'궤적','목표','최종'}, 'Location','best', 'FontSize',8);
         axis(ui.axXY,'equal'); hold(ui.axXY,'off');
 
-        if isempty(res.gate)
-            text(ui.axSon, 0.5, 0.5, '소나 게이트 블록 없음', 'Units','normalized', ...
-                'HorizontalAlignment','center');
-        else
-            area(ui.axSon, res.t, res.gate, 'FaceColor',[0.72 0.85 0.98], 'EdgeColor','none');
-            ylim(ui.axSon, [-0.1 1.1]);
-        end
+        area(ui.axSon, res.t, res.gate, 'FaceColor',[0.72 0.85 0.98], 'EdgeColor','none');
+        ylim(ui.axSon, [-0.1 1.1]);
+        title(ui.axSon, sprintf('소나 사용 구간 (%s)', res.gateSrc));
 
         lines = {};
         if strcmp(cfg.mode,'impact')
@@ -427,9 +538,7 @@ showScenario('impact');
         lines{end+1} = sprintf('최대 이탈   : 수평 %.3f m (목표점 기준)', res.maxDev);
         lines{end+1} = sprintf('복귀 오차   : 수평 %.3f m,  고도 %+.3f m,  최종 기울기 %.1f°', ...
             res.errXY, res.errZ, res.endTilt);
-        if ~isnan(res.gateFrac)
-            lines{end+1} = sprintf('소나 사용   : %.0f%% (나머지는 기압계가 대신함)', res.gateFrac*100);
-        end
+        lines{end+1} = sprintf('소나 사용   : %.0f%% (나머지는 기압계가 대신함)', res.gateFrac*100);
         ui.scoreTxt.Text = strjoin(lines, newline);
 
         if res.success
