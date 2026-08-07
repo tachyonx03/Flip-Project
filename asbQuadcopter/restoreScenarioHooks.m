@@ -20,6 +20,10 @@ function status = restoreScenarioHooks(action)
 %        init_Cbe / init_W / init_xN / init_vN 을 읽는다. 이 네 개는 입력 포트가
 %        아니라 Parameter 스코프라서 블록 배선은 전혀 바뀌지 않는다.
 %
+%     ④ ImpactClock 은 반드시 Digital Clock(Ts). ①②가 공유한다.
+%        연속시간 Clock 을 쓰면 airframe 전체가 연속시간으로 끌려가 플랜트가
+%        3배 빨리 적분된다 (i_clockDiscrete 주석 참고).
+%
 %   안전성: startVars.m 의 기본값(impact_F=0, release_delay=0,
 %   init_* = 기존 하드코딩값과 동일)이 전부 무동작이라, 복구 전후로
 %   flipSweep / ttRun / flipYawDiag 의 결과는 달라지지 않는다.
@@ -29,15 +33,22 @@ function status = restoreScenarioHooks(action)
 %     여기서는 그 버그를 되살리지 않고 '+ - +' (Step, -Step1, +impact_tau)로 넣는다.
 %
 %   사용법
-%     restoreScenarioHooks            현재 상태만 점검해서 출력 (기본값)
-%     restoreScenarioHooks('apply')   훅 복구 + nonlinearAirframe 저장
-%     restoreScenarioHooks('undo')    훅 제거(dd12f10 상태로) + 저장
-%     s = restoreScenarioHooks(...)   결과를 구조체로 반환 (출력 없음)
+%     restoreScenarioHooks             현재 상태만 점검해서 출력 (기본값)
+%     restoreScenarioHooks('session')  훅 복구, 단 파일은 저장하지 않음
+%     restoreScenarioHooks('apply')    훅 복구 + nonlinearAirframe 저장
+%     restoreScenarioHooks('undo')     훅 제거(dd12f10 상태로) + 저장
+%     s = restoreScenarioHooks(...)    결과를 구조체로 반환 (출력 없음)
+%
+%   'session' 은 'apply' 와 똑같이 훅을 넣지만 save_system 을 하지 않는다.
+%   nonlinearAirframe.slx 는 팀원(dd12f10)이 훅을 걷어낸 상태 그대로 디스크에
+%   남고, 열려 있는 세션에서만 시나리오가 돈다. 공용 바이너리 모델에 diff 를
+%   남기지 않으므로 병합 충돌 없이 혼자 시나리오를 돌려볼 때 이쪽을 쓴다.
+%   단 MATLAB 을 닫거나 bdclose 하면 사라지므로 그때마다 다시 불러야 한다.
 %
 %   See also FLIPSCENARIOUI, STARTVARS.
 
 if nargin < 1 || isempty(action), action = 'check'; end
-action = validatestring(action, {'check','apply','undo'});
+action = validatestring(action, {'check','apply','session','undo'});
 
 MDL = 'nonlinearAirframe';
 NL  = [MDL '/Nonlinear'];
@@ -60,17 +71,24 @@ switch action
     case 'check'
         if verbose, i_report(status); end
         return
-    case 'apply'
+    case {'apply','session'}
         changed = i_apply(NL, POS, status);
     case 'undo'
         changed = i_undo(NL, POS, status);
 end
 
+keepOnDisk = strcmp(action,'session');   % 세션 한정: 저장하지 않는다
+
 if changed
-    save_system(MDL);
+    if keepOnDisk
+        note = sprintf('%s 는 저장하지 않았습니다 (이 세션에서만 유효).', MDL);
+    else
+        save_system(MDL);
+        note = sprintf('%s 저장했습니다.', MDL);
+    end
     status = i_survey(NL);
     if verbose
-        fprintf('[restoreScenarioHooks] %s 완료 — %s 저장했습니다.\n', action, MDL);
+        fprintf('[restoreScenarioHooks] %s 완료 — %s\n', action, note);
         i_report(status);
     end
 else
@@ -89,13 +107,29 @@ s.impact    = i_has([NL '/ImpactGen']) && i_has([NL '/ImpactClock']);
 s.motorGate = i_has([NL '/MotorGate']) && i_has([NL '/MotorGateCmp']) && ...
               i_has([NL '/MotorGateDelay']) && i_has([NL '/MotorGateZero']);
 s.initState = contains(i_script([NL '/MATLAB Function']), 'init_Cbe');
-s.allReady  = s.impact && s.motorGate && s.initState;
+s.clock     = i_clockDiscrete([NL '/ImpactClock']);
+s.allReady  = s.impact && s.motorGate && s.initState && s.clock;
+end
+
+% ImpactClock 은 반드시 Digital Clock(Ts) 여야 한다. 연속시간 Clock 을 쓰면
+% Step/Step1 이 상속(-1) 샘플타임이라 그 하나가 AC model·Actuators·
+% SO3_dynamics 까지 airframe 전체를 연속시간으로 끌고 간다. SO3_dynamics 는
+% dt=0.005 를 하드코딩한 채 persistent 로 상태를 들고 있어서, 고정스텝 ode3
+% 의 스테이지마다(스텝당 3회) 불리며 매번 5 ms 를 적분한다. 플랜트가 3배
+% 빨리 도는 셈이라 impact_F=0 인 무동작 기본값에서도 기체가 1.5초 만에
+% 뒤집혀 1300 m 를 날아간다. (2026-08-07 실측: Digital Clock 으로 바꾸면
+% 훅 없는 기준 비행과 소수점까지 동일한 결과가 나온다.)
+function tf = i_clockDiscrete(path)
+tf = false;
+if getSimulinkBlockHandle(path) <= 0, return; end
+tf = strcmp(get_param(path,'BlockType'), 'DigitalClock');
 end
 
 function i_report(s)
 fprintf('  ① 타격 (ImpactGen/ImpactClock)        : %s\n', i_yn(s.impact));
 fprintf('  ② 모터 정지 (MotorGate 4종)           : %s\n', i_yn(s.motorGate));
 fprintf('  ③ 초기 자세 (SO3_dynamics init_* 인자): %s\n', i_yn(s.initState));
+fprintf('  ④ ImpactClock 이 이산(Digital, Ts)    : %s\n', i_yn(s.clock));
 if s.allReady
     fprintf('  => flipScenarioUI 를 그대로 실행하면 됩니다.\n');
 else
@@ -111,9 +145,14 @@ function tf = i_has(path)
 tf = getSimulinkBlockHandle(path) > 0;
 end
 
+function i_addClock(NL, POS)
+add_block('simulink/Sources/Digital Clock', [NL '/ImpactClock'], ...
+    'Position', POS.ImpactClock, 'SampleTime', 'Ts');
+end
+
 function s = i_script(path)
 s = '';
-ch = sfroot.find('-isa','Stateflow.EMChart','Path',path);
+ch = sfroot().find('-isa','Stateflow.EMChart','Path',path);
 if ~isempty(ch), s = ch(1).Script; end
 end
 
@@ -123,6 +162,24 @@ end
 function changed = i_apply(NL, POS, st)
 changed = false;
 
+% ---------- ④ 레거시 연속시간 Clock 교체 ----------
+% 이 파일의 예전 버전은 ImpactClock 을 연속시간 Clock 으로 넣었다. 그 상태로
+% 저장된 모델을 만나면 여기서 Digital Clock(Ts) 로 갈아끼운다. 이유는
+% i_clockDiscrete 주석 참고.
+if i_has([NL '/ImpactClock']) && ~st.clock
+    i_dropLine(NL, 'ImpactClock/1', 'ImpactGen/1');
+    i_dropLine(NL, 'ImpactClock/1', 'MotorGateCmp/1');
+    i_dropBlock([NL '/ImpactClock']);
+    i_addClock(NL, POS);
+    if i_has([NL '/ImpactGen'])
+        add_line(NL, 'ImpactClock/1', 'ImpactGen/1', 'autorouting','on');
+    end
+    if i_has([NL '/MotorGateCmp'])
+        add_line(NL, 'ImpactClock/1', 'MotorGateCmp/1', 'autorouting','on');
+    end
+    changed = true;
+end
+
 % ---------- ③ SO3_dynamics 초기조건 파라미터화 ----------
 if ~st.initState
     i_patchPlant(NL, true);
@@ -131,12 +188,13 @@ end
 
 % ---------- ① ImpactGen ----------
 if ~st.impact
-    add_block('simulink/Sources/Clock', [NL '/ImpactClock'], ...
-        'Position', POS.ImpactClock);
+    if ~i_has([NL '/ImpactClock'])
+        i_addClock(NL, POS);
+    end
 
     add_block('simulink/User-Defined Functions/MATLAB Function', ...
         [NL '/ImpactGen'], 'Position', POS.ImpactGen);
-    ch = sfroot.find('-isa','Stateflow.EMChart','Path',[NL '/ImpactGen']);
+    ch = sfroot().find('-isa','Stateflow.EMChart','Path',[NL '/ImpactGen']);
     ch.Script = i_impactScript();
     i_setParamScope(ch, {'impact_t0','impact_dur','impact_F','impact_r'});
 
@@ -170,8 +228,7 @@ if ~st.motorGate
 
     % ImpactClock 이 방금 생겼을 수도, 이미 있었을 수도 있다
     if ~i_has([NL '/ImpactClock'])
-        add_block('simulink/Sources/Clock', [NL '/ImpactClock'], ...
-            'Position', POS.ImpactClock);
+        i_addClock(NL, POS);
     end
 
     i_dropLine(NL, 'Actuators/1', 'AC model/1');
@@ -227,7 +284,7 @@ end
 %  주석(한글 포함)을 건드리지 않도록 딱 5군데만 문자열 치환한다.
 % ======================================================================
 function i_patchPlant(NL, toParameterized)
-ch = sfroot.find('-isa','Stateflow.EMChart','Path',[NL '/MATLAB Function']);
+ch = sfroot().find('-isa','Stateflow.EMChart','Path',[NL '/MATLAB Function']);
 if isempty(ch)
     error('restoreScenarioHooks:noPlant', '%s/MATLAB Function 을 찾지 못했습니다.', NL);
 end
@@ -294,7 +351,8 @@ end
 end
 
 % ======================================================================
-%  ImpactGen 본문 (f57f5b5 원본 그대로)
+%  ImpactGen 본문 (f57f5b5 원본과 동일한 3x1 열벡터 출력.
+%  AC model 의 tau_ext/force_ext 인포트가 둘 다 PortDimensions [3 1] 이다.)
 % ======================================================================
 function s = i_impactScript()
 s = sprintf('%s\n', ...
@@ -307,7 +365,9 @@ s = sprintf('%s\n', ...
 'F   = zeros(3,1);', ...
 'tau = zeros(3,1);', ...
 'if (t >= impact_t0) && (t < impact_t0 + impact_dur)', ...
-'    F   = impact_F;', ...
-'    tau = cross(impact_r, impact_F);', ...
+'    fb  = impact_F(:);', ...
+'    rb  = impact_r(:);', ...
+'    F   = fb;', ...
+'    tau = cross(rb, fb);', ...
 'end');
 end
