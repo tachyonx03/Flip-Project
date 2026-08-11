@@ -12,3 +12,4 @@ cmdData_backup_*.xlsx
 # --- Syncthing으로 공유 (커밋 제외) ---
 참고논문/
 MDfiles/
+_slx_backup_*/
