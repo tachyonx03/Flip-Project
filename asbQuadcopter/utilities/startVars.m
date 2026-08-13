@@ -85,8 +85,11 @@ load('modelParrot');
 % Obtain vehicle variables
 vehicleVars;
 % 개발용 자이로 포화 해제. sensorsVars 보다 먼저 정의되어야 함
-unlockGyro = 1;   % 1이면 sensorsVars.m 이 gyroLimits 를 1e5배로 키움
-                  % 이 상태에서 A<=0.36 까지 전량 추정 비행 성립 (2026-08-02 검증)
+% 기본값 = 0 (실기 자이로 FS 34.907). 1이면 sensorsVars.m 이 gyroLimits 를 1e5배로 키움
+% 이미 정의돼 있으면 덮어쓰지 않음 — startVars 재실행이 세션 설정을 조용히 되돌리는 사고 방지 (2026-08-12)
+if ~exist('unlockGyro','var')
+    unlockGyro = 0;
+end
 % Obtain sensor variables
 sensorsVars;
 % Obtain controller variables
