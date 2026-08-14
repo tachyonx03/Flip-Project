@@ -14,7 +14,7 @@ function flipScenarioUI()
 %
 %   The hooks were deleted from the airframe in dd12f10, so if they are
 %   missing this screen locks the run button instead of quietly flying a
-%   plain hover and calling it a success. The [훅 적용 (이 세션만)] button
+%   plain hover and calling it a success. The [Apply hooks (session only)] button
 %   puts them back with restoreScenarioHooks('session'), which patches the
 %   loaded model only and leaves nonlinearAirframe.slx untouched on disk -
 %   no diff on the shared binary model, no merge conflict with the team.
@@ -57,7 +57,7 @@ reportReadiness();
         left.Padding = [0 0 0 0];
         left.RowSpacing = 10;
 
-        t = uilabel(left, 'Text','시나리오 선택', 'FontSize',20, 'FontWeight','bold');
+        t = uilabel(left, 'Text','Choose a scenario', 'FontSize',20, 'FontWeight','bold');
         t.Layout.Row = 1;
 
         % mode cards
@@ -66,10 +66,10 @@ reportReadiness();
         modes.ColumnSpacing = 8;
         modes.Layout.Row = 2;
         ui.btnImpact = uibutton(modes, 'state', ...
-            'Text', sprintf('① 타격\n기체를 친다'), 'FontSize',14, 'Value',true, ...
+            'Text', sprintf('(1) Impact\nhit the airframe'), 'FontSize',14, 'Value',true, ...
             'ValueChangedFcn', @(s,~) selectMode(s,'impact'));
         ui.btnAtt = uibutton(modes, 'state', ...
-            'Text', sprintf('② 초기 자세\n기울여서 놓는다'), 'FontSize',14, 'Value',false, ...
+            'Text', sprintf('(2) Initial attitude\nrelease it tilted'), 'FontSize',14, 'Value',false, ...
             'ValueChangedFcn', @(s,~) selectMode(s,'attitude'));
 
         % parameter card holder
@@ -85,12 +85,12 @@ reportReadiness();
         actions.Padding = [0 0 0 0];
         actions.ColumnWidth = {170, '1x'};
         actions.ColumnSpacing = 8;
-        ui.hookBtn = uibutton(actions, 'Text','훅 적용 (이 세션만)', 'FontSize',13, ...
+        ui.hookBtn = uibutton(actions, 'Text','Apply hooks (session only)', 'FontSize',13, ...
             'Enable','off', 'ButtonPushedFcn', @(~,~) onApplyHooks());
-        ui.runBtn = uibutton(actions, 'Text','▶  시뮬레이션 실행', 'FontSize',15, ...
+        ui.runBtn = uibutton(actions, 'Text','>  Run simulation', 'FontSize',15, ...
             'FontWeight','bold', 'ButtonPushedFcn', @(~,~) onRun());
 
-        ui.status = uilabel(left, 'Text','대기 중', 'FontColor',[0.35 0.35 0.35]);
+        ui.status = uilabel(left, 'Text','Idle', 'FontColor',[0.35 0.35 0.35]);
         ui.status.Layout.Row = 5;
 
         % ---------------- right: results ----------------
@@ -102,83 +102,83 @@ reportReadiness();
         plots = uigridlayout(right, [2 2]);
         plots.Layout.Row = 1;
         plots.Padding = [0 0 0 0];
-        ui.axTilt = uiaxes(plots); title(ui.axTilt,'자세 기울기');   ylabel(ui.axTilt,'tilt [deg]');
-        ui.axAlt  = uiaxes(plots); title(ui.axAlt,'고도');           ylabel(ui.axAlt,'alt [m]');
-        ui.axXY   = uiaxes(plots); title(ui.axXY,'수평 궤적 (위에서 본 모습)');
-        ui.axSon  = uiaxes(plots); title(ui.axSon,'소나 사용 구간');  ylabel(ui.axSon,'valid');
+        ui.axTilt = uiaxes(plots); title(ui.axTilt,'Attitude tilt');  ylabel(ui.axTilt,'tilt [deg]');
+        ui.axAlt  = uiaxes(plots); title(ui.axAlt,'Altitude');        ylabel(ui.axAlt,'alt [m]');
+        ui.axXY   = uiaxes(plots); title(ui.axXY,'Horizontal track (top view)');
+        ui.axSon  = uiaxes(plots); title(ui.axSon,'Sonar valid window'); ylabel(ui.axSon,'valid');
         for ax = [ui.axTilt ui.axAlt ui.axXY ui.axSon]
             grid(ax,'on'); xlabel(ax,'time [s]');
         end
         xlabel(ui.axXY,'X [m]'); ylabel(ui.axXY,'Y [m]');
 
-        scorePanel = uipanel(right, 'Title','결과', 'FontWeight','bold');
+        scorePanel = uipanel(right, 'Title','Results', 'FontWeight','bold');
         scorePanel.Layout.Row = 2;
         sg = uigridlayout(scorePanel, [1 2]);
         sg.ColumnWidth = {'1x', 190};
-        ui.scoreTxt = uilabel(sg, 'Text','아직 실행하지 않았습니다.', ...
+        ui.scoreTxt = uilabel(sg, 'Text','Nothing has been run yet.', ...
             'VerticalAlignment','top', 'Interpreter','none');
         ui.verdict = uilabel(sg, 'Text','', 'FontSize',26, 'FontWeight','bold', ...
             'HorizontalAlignment','center');
     end
 
     function buildImpactPanel(parent)
-        ui.pImpact = uipanel(parent, 'Title','① 타격 설정', 'FontWeight','bold');
+        ui.pImpact = uipanel(parent, 'Title','(1) Impact settings', 'FontWeight','bold');
         ui.pImpact.Layout.Row = 1; ui.pImpact.Layout.Column = 1;
         g = uigridlayout(ui.pImpact, [9 2]);
         g.ColumnWidth = {150, '1x'};
-        g.RowHeight = [repmat({30}, 1, 8), {'1x'}];   % 마지막 행 = 설명, 잘리지 않게
+        g.RowHeight = [repmat({30}, 1, 8), {'1x'}];   % last row = hint, keep it from clipping
 
-        ui.impJ    = addSlider(g, 1, '충격량 J [N·s]', [0.002 0.06], 0.030, '%.3f');
-        ui.impRad  = addSlider(g, 2, '타격점 반경 [cm]', [0 ARM*100], 0, '%.1f');
-        ui.impAzP  = addSlider(g, 3, '타격점 방위 [deg]', [0 360], 0, '%.0f');
-        ui.impHgt  = addSlider(g, 4, '타격 높이 [cm]', [-5 5], 3, '%.1f');
-        ui.impAzF  = addSlider(g, 5, '힘 방향 방위 [deg]', [0 360], 90, '%.0f');
-        ui.impElF  = addSlider(g, 6, '힘 방향 앙각 [deg]', [-90 90], 0, '%.0f');
-        ui.impDur  = addSlider(g, 7, '접촉 시간 [ms]', [20 100], 30, '%.0f');
-        ui.impT0   = addSlider(g, 8, '타격 시각 [s]', [6 15], 10, '%.1f');
+        ui.impJ    = addSlider(g, 1, 'Impulse J [N·s]', [0.002 0.06], 0.030, '%.3f');
+        ui.impRad  = addSlider(g, 2, 'Hit radius [cm]', [0 ARM*100], 0, '%.1f');
+        ui.impAzP  = addSlider(g, 3, 'Hit azimuth [deg]', [0 360], 0, '%.0f');
+        ui.impHgt  = addSlider(g, 4, 'Hit height [cm]', [-5 5], 3, '%.1f');
+        ui.impAzF  = addSlider(g, 5, 'Force azimuth [deg]', [0 360], 90, '%.0f');
+        ui.impElF  = addSlider(g, 6, 'Force elevation [deg]', [-90 90], 0, '%.0f');
+        ui.impDur  = addSlider(g, 7, 'Contact time [ms]', [20 100], 30, '%.0f');
+        ui.impT0   = addSlider(g, 8, 'Hit time [s]', [6 15], 10, '%.1f');
 
         hint = uilabel(g, 'Text', sprintf([ ...
-            '· 기본값 = 무게중심 3 cm 위를 옆에서 미는 상황 → 롤로 기울며 옆으로 밀림\n' ...
-            '· 이 형상 실측 (2026-08-07, unlockGyro=1) — 최대 기울기 / 회복시간:\n' ...
-            '    J 0.015 → 5.8° 0.07초    J 0.022 → 9.9° 0.18초\n' ...
-            '    J 0.030 → 13.3° 0.27초   J 0.045 → 20.0° 0.75초\n' ...
-            '  전부 회복하고 접지 없음. 슬라이더 최대(0.06)까지 가도 안 넘어간다.\n' ...
-            '  J 0.010 아래는 호버 자체의 기울기 지터(약 4°)에 묻혀 잘 안 보인다.\n' ...
-            '· 높이 0 + 반경 0 = 정중앙 정타 → 안 돌고 밀리기만 함\n' ...
-            '· 팔 끝을 수평으로 치면 토크가 대부분 요(yaw)로 간다. 요는 이 기체의\n' ...
-            '  약한 축이라 작은 충격에도 크게 흔들린다 (flipYawDiag.m 참고)']), ...
+            '- Default = pushed from the side, 3 cm above the CG -> rolls and slides.\n' ...
+            '- Measured on this geometry (2026-08-07, unlockGyro=1) peak tilt / recovery:\n' ...
+            '    J 0.015 -> 5.8 deg, 0.07 s     J 0.022 -> 9.9 deg, 0.18 s\n' ...
+            '    J 0.030 -> 13.3 deg, 0.27 s    J 0.045 -> 20.0 deg, 0.75 s\n' ...
+            '  All recover, none touch the ground. Even the slider max (0.06) will not tip it.\n' ...
+            '  Below J 0.010 the response is buried in the hover tilt jitter (about 4 deg).\n' ...
+            '- Height 0 + radius 0 = dead-centre hit -> it translates without rotating.\n' ...
+            '- Hitting an arm tip horizontally sends most of the torque into yaw, the weak\n' ...
+            '  axis of this airframe, so it swings hard for very little input (flipYawDiag.m).']), ...
             'FontSize',11, 'FontColor',[0.35 0.35 0.35]);
         hint.Layout.Row = 9; hint.Layout.Column = [1 2];
     end
 
     function buildAttitudePanel(parent)
-        ui.pAtt = uipanel(parent, 'Title','② 초기 자세 설정', 'FontWeight','bold', 'Visible','off');
+        ui.pAtt = uipanel(parent, 'Title','(2) Initial attitude settings', 'FontWeight','bold', 'Visible','off');
         ui.pAtt.Layout.Row = 1; ui.pAtt.Layout.Column = 1;
         g = uigridlayout(ui.pAtt, [7 2]);
         g.ColumnWidth = {150, '1x'};
-        g.RowHeight = [repmat({32}, 1, 6), {'1x'}];   % 마지막 행 = 설명, 잘리지 않게
+        g.RowHeight = [repmat({32}, 1, 6), {'1x'}];   % last row = hint, keep it from clipping
 
-        ui.attTilt = addSlider(g, 1, '초기 기울기 [deg]', [0 180], 120, '%.0f', @() updateAdvice());
-        ui.attAz   = addSlider(g, 2, '기울기 방향 [deg]', [0 360], 0, '%.0f');
-        ui.attAlt  = addSlider(g, 3, '방출 고도 [m]', [2 25], 10, '%.1f', @() updateAdvice());
-        ui.attSpin = addSlider(g, 4, '초기 회전 [deg/s]', [0 600], 0, '%.0f');
-        ui.attHold = addSlider(g, 5, '모터 정지 시간 [s]', [0 1.5], 0, '%.2f');
+        ui.attTilt = addSlider(g, 1, 'Initial tilt [deg]', [0 180], 120, '%.0f', @() updateAdvice());
+        ui.attAz   = addSlider(g, 2, 'Tilt azimuth [deg]', [0 360], 0, '%.0f');
+        ui.attAlt  = addSlider(g, 3, 'Release altitude [m]', [2 25], 10, '%.1f', @() updateAdvice());
+        ui.attSpin = addSlider(g, 4, 'Initial spin [deg/s]', [0 600], 0, '%.0f');
+        ui.attHold = addSlider(g, 5, 'Motor hold [s]', [0 1.5], 0, '%.2f');
 
         ui.advice = uilabel(g, 'Text','', 'FontSize',12, 'FontWeight','bold');
         ui.advice.Layout.Row = 6; ui.advice.Layout.Column = [1 2];
 
         hint = uilabel(g, 'Text', sprintf([ ...
-            '· 모터 정지 시간 동안은 아이들 추력만 나가므로 사실상 자유낙하한다.\n' ...
-            '  0 이면 컨트롤러가 t=0 부터 바로 싸운다.\n' ...
-            '· 2026-08-07 실측 (기울기 방향 0°, 초기 회전 0, 모터 정지 0):\n' ...
-            '    3 m / 0°  → 최대 37°, 1.33초 회복, 최종 오차 1.5 m (접지는 면함)\n' ...
-            '    4 m / 0°  → 접지     6 m / 0° → 접지     8 m / 0° → 접지\n' ...
-            '    4 m / 30·60·90·120° → 전부 접지\n' ...
-            '· 즉 결과를 가르는 건 기울기가 아니라 방출 고도다. 호버 목표(3 m)보다\n' ...
-            '  높이 놓으면 현재 제어기가 낙하를 못 잡는다. 자세 회복 자체는 빠르고,\n' ...
-            '  진짜 문제는 회복하는 동안 잃는 고도다.\n' ...
-            '· 추정기 초기값이 패드 기준(고도 0)이라 방출 순간부터 고도 오차를\n' ...
-            '  안고 시작한다는 점도 같이 의심해 볼 것.']), ...
+            '- During the motor hold only idle thrust is commanded, so it is effectively in\n' ...
+            '  free fall. At 0 the controller fights from t=0.\n' ...
+            '- Measured 2026-08-07 (tilt azimuth 0 deg, no spin, no hold):\n' ...
+            '    3 m / 0 deg -> peak 37 deg, recovers in 1.33 s, 1.5 m final error (survives)\n' ...
+            '    4 m / 0 deg -> ground    6 m / 0 deg -> ground    8 m / 0 deg -> ground\n' ...
+            '    4 m / 30, 60, 90, 120 deg -> ground, every one\n' ...
+            '- So the outcome is decided by release altitude, not tilt. Above the 3 m hover\n' ...
+            '  target the current controller cannot arrest the fall. Attitude recovery itself\n' ...
+            '  is fast; the real problem is the altitude lost while recovering.\n' ...
+            '- Also suspect the estimator initial condition: it starts from the pad (alt 0),\n' ...
+            '  so it carries an altitude error from the moment of release.']), ...
             'FontSize',11, 'FontColor',[0.35 0.35 0.35]);
         hint.Layout.Row = 7; hint.Layout.Column = [1 2];
         updateAdvice();
@@ -241,12 +241,12 @@ reportReadiness();
         alt = ui.attAlt.Value;
         if alt <= HOVER_Z + 0.2
             ui.advice.Text = sprintf( ...
-                '방출 고도 %.1f m — 호버 목표(%.1f m) 부근. 접지는 면하는 유일한 구간.', ...
+                'Release at %.1f m - near the hover target (%.1f m). The only band that survives.', ...
                 alt, HOVER_Z);
             ui.advice.FontColor = [0.05 0.45 0.15];
         else
             ui.advice.Text = sprintf( ...
-                '방출 고도 %.1f m — 목표(%.1f m)보다 높다. 기울기와 무관하게 거의 다 추락.', ...
+                'Release at %.1f m - above the target (%.1f m). Almost always crashes, whatever the tilt.', ...
                 alt, HOVER_Z);
             ui.advice.FontColor = [0.70 0.25 0.05];
         end
@@ -255,62 +255,63 @@ reportReadiness();
 % ======================================================================
 %  Readiness - the airframe hooks have to be there for any of this to mean
 %  anything. Without them the model still runs; it just flies a plain hover
-%  and every scenario scores a meaningless "성공".
+%  and every scenario scores a meaningless "SUCCESS".
 % ======================================================================
     function reportReadiness()
         try
             st = restoreScenarioHooks('check');
         catch err
-            % 점검 자체가 터지면 훅이 있는지 없는지 알 수 없다. 모르는 채로
-            % 돌리면 외란 없는 호버가 "성공" 으로 찍히므로 실행을 막는다.
+            % If the check itself blows up we cannot tell whether the hooks are
+            % there. Running blind would score a disturbance-free hover as a
+            % "success", so lock the run button instead.
             ui.runBtn.Enable  = 'off';
             ui.hookBtn.Enable = 'off';
-            setStatus(['훅 점검 실패: ' err.message], [0.75 0.15 0.10]);
+            setStatus(['Hook check failed: ' err.message], [0.75 0.15 0.10]);
             ui.scoreTxt.Text = sprintf([ ...
-                'restoreScenarioHooks(''check'') 가 실패해서 시나리오 훅의 유무를\n' ...
-                '확인할 수 없습니다. 확인 안 된 채로 돌리면 외란 없는 호버가\n' ...
-                '"성공" 으로 찍히므로 실행을 막았습니다.\n\n오류: %s'], err.message);
+                'restoreScenarioHooks(''check'') failed, so the presence of the scenario\n' ...
+                'hooks cannot be confirmed. Running unchecked would score a\n' ...
+                'disturbance-free hover as a success, so the run button is locked.\n\nError: %s'], err.message);
             ui.verdict.Text = '';
             return;
         end
         if st.allReady
             ui.runBtn.Enable  = 'on';
             ui.hookBtn.Enable = 'off';
-            ui.hookBtn.Text   = '훅 적용됨';
-            ui.scoreTxt.Text  = '아직 실행하지 않았습니다.';
+            ui.hookBtn.Text   = 'Hooks applied';
+            ui.scoreTxt.Text  = 'Nothing has been run yet.';
             ui.verdict.Text   = '';
-            setStatus(sprintf('준비 완료 — %s', gyroRegime()), [0.35 0.35 0.35]);
+            setStatus(sprintf('Ready - %s', gyroRegime()), [0.35 0.35 0.35]);
         else
             ui.runBtn.Enable  = 'off';
             ui.hookBtn.Enable = 'on';
             missing = {};
-            if ~st.impact,    missing{end+1} = '타격'; end
-            if ~st.motorGate, missing{end+1} = '모터 정지'; end
-            if ~st.initState, missing{end+1} = '초기 자세'; end
-            if ~st.clock,     missing{end+1} = '이산 클럭'; end
-            setStatus(sprintf('훅 없음(%s) — 왼쪽 [훅 적용] 버튼을 누르세요', ...
+            if ~st.impact,    missing{end+1} = 'impact'; end
+            if ~st.motorGate, missing{end+1} = 'motor gate'; end
+            if ~st.initState, missing{end+1} = 'initial attitude'; end
+            if ~st.clock,     missing{end+1} = 'discrete clock'; end
+            setStatus(sprintf('Hooks missing (%s) - press [Apply hooks] on the left', ...
                 strjoin(missing,', ')), [0.75 0.15 0.10]);
             ui.scoreTxt.Text = sprintf([ ...
-                'nonlinearAirframe 에 시나리오 훅이 없습니다 (커밋 dd12f10 에서 삭제됨).\n' ...
-                '이 상태로 실행하면 외란이 하나도 없는 호버만 돌아 결과가 무의미하므로\n' ...
-                '실행 버튼을 잠갔습니다.\n\n' ...
-                '[훅 적용 (이 세션만)] = restoreScenarioHooks(''session'')\n' ...
-                '  → 열려 있는 모델에만 훅을 넣습니다. nonlinearAirframe.slx 파일은\n' ...
-                '    건드리지 않으므로 공용 모델에 diff 가 남지 않습니다.\n' ...
-                '    MATLAB 을 닫으면 사라지니 새 세션마다 다시 눌러야 합니다.\n\n' ...
-                '디스크에 아예 되돌리려면 명령창에서 restoreScenarioHooks(''apply'')\n' ...
-                '— 단 이건 팀 공용 nonlinearAirframe.slx 를 수정합니다.']);
+                'nonlinearAirframe has no scenario hooks (removed in commit dd12f10).\n' ...
+                'Running like this would fly a hover with no disturbance at all, which\n' ...
+                'is meaningless, so the run button is locked.\n\n' ...
+                '[Apply hooks (session only)] = restoreScenarioHooks(''session'')\n' ...
+                '  -> Patches the loaded model only. The nonlinearAirframe.slx file on\n' ...
+                '     disk is untouched, so no diff lands on the shared model.\n' ...
+                '     It is lost when MATLAB closes - press it again each session.\n\n' ...
+                'To restore it on disk for good, run restoreScenarioHooks(''apply'') from\n' ...
+                'the command window - but that does modify the shared nonlinearAirframe.slx.']);
             ui.verdict.Text = '';
         end
     end
 
     function onApplyHooks()
         ui.hookBtn.Enable = 'off';
-        setStatus('훅 적용 중...', [0.10 0.35 0.70]);
+        setStatus('Applying hooks...', [0.10 0.35 0.70]);
         try
             restoreScenarioHooks('session');
         catch err
-            setStatus(['훅 적용 실패: ' err.message], [0.75 0.15 0.10]);
+            setStatus(['Applying hooks failed: ' err.message], [0.75 0.15 0.10]);
             ui.hookBtn.Enable = 'on';
             return;
         end
@@ -318,16 +319,17 @@ reportReadiness();
     end
 
     function s = gyroRegime()
-        % unlockGyro=1 이면 자이로 포화가 풀린 상태라 결과 해석이 달라진다.
+        % With unlockGyro=1 the gyro no longer saturates, which changes how every
+        % number on screen has to be read.
         try
             lim = max(evalin('base','Sensors.IMU.gyroLimits'));
         catch
-            s = '자이로 설정 미확인'; return;
+            s = 'gyro setting unknown'; return;
         end
         if lim > 100
-            s = sprintf('자이로 포화 해제됨 (±%.0f rad/s, unlockGyro=1)', lim);
+            s = sprintf('gyro saturation OFF (+/-%.0f rad/s, unlockGyro=1)', lim);
         else
-            s = sprintf('자이로 실기값 (±%.1f rad/s)', lim);
+            s = sprintf('real gyro (+/-%.1f rad/s)', lim);
         end
     end
 
@@ -342,16 +344,16 @@ reportReadiness();
 % ======================================================================
     function onRun()
         ui.runBtn.Enable = 'off';
-        setStatus('실행 중...', [0.10 0.35 0.70]);
+        setStatus('Running...', [0.10 0.35 0.70]);
         cleanupObj = onCleanup(@() set(ui.runBtn,'Enable','on'));
         try
             cfg = gatherConfig();
             res = runScenario(cfg);
             drawResults(cfg, res);
-            setStatus(sprintf('완료 (%.1f 초 시뮬) — %s', cfg.stopTime, gyroRegime()), ...
+            setStatus(sprintf('Done (%.1f s simulated) - %s', cfg.stopTime, gyroRegime()), ...
                 [0.35 0.35 0.35]);
         catch err
-            setStatus(['오류: ' err.message], [0.75 0.15 0.10]);
+            setStatus(['Error: ' err.message], [0.75 0.15 0.10]);
             rethrow(err);
         end
     end
@@ -463,11 +465,11 @@ reportReadiness();
         %   valid = R33 > cos(45 deg) and 0.44 <= slant <= 5   .../SonarRangeCheck
         slant = min(res.Z ./ max(R33, 0.087), 5);
         res.gate    = double((R33 > 0.7071) & (slant >= 0.44) & (slant <= 5.0));
-        res.gateSrc = '참값으로 재현';
+        res.gateSrc = 'reconstructed from truth';
         try
             gv = out.get('logsout').getElement('meas_valid').Values;
             res.gate    = interp1(gv.Time, double(squeeze(gv.Data)), res.t, 'previous','extrap');
-            res.gateSrc = '추정기 실측';
+            res.gateSrc = 'logged from estimator';
         catch
         end
 
@@ -493,7 +495,7 @@ reportReadiness();
         wIdx = find(w);
         if isempty(wIdx)
             error('flipScenarioUI:emptyWindow', ...
-                '평가 구간이 비어 있습니다 (시작 %.2f s > 시뮬 길이 %.2f s).', ...
+                'Evaluation window is empty (start %.2f s > run length %.2f s).', ...
                 cfg.evalFrom, res.t(end));
         end
         iEnd  = wIdx(end);
@@ -590,12 +592,12 @@ reportReadiness();
         cla(ui.axTilt); cla(ui.axAlt); cla(ui.axXY); cla(ui.axSon);
 
         plot(ui.axTilt, res.t, res.tilt, 'LineWidth',1.4, 'Color',[0.45 0.10 0.55]);
-        yline(ui.axTilt, 45, '--', '소나 게이트 45°');
+        yline(ui.axTilt, 45, '--', 'sonar gate 45 deg');
         ylim(ui.axTilt, [0 max(50, max(res.tilt)*1.1)]);
 
         plot(ui.axAlt, res.t, res.Z, 'LineWidth',1.5, 'Color',[0.10 0.10 0.10]); hold(ui.axAlt,'on');
-        yline(ui.axAlt, cfg.hoverZ, '--', '목표 고도');
-        yline(ui.axAlt, 0, '-', '지면', 'Color',[0.7 0.2 0.1]);
+        yline(ui.axAlt, cfg.hoverZ, '--', 'target altitude');
+        yline(ui.axAlt, 0, '-', 'ground', 'Color',[0.7 0.2 0.1]);
         hold(ui.axAlt,'off');
 
         % Only the evaluated stretch is drawn. A crashed airframe keeps sliding
@@ -606,58 +608,58 @@ reportReadiness();
             'MarkerFaceColor',[0.95 0.75 0.10], 'MarkerEdgeColor','k');
         plot(ui.axXY, res.X(res.iEnd), res.Y(res.iEnd), 'o', 'MarkerSize',8, ...
             'MarkerFaceColor',[0.85 0.25 0.15], 'MarkerEdgeColor','k');
-        legend(ui.axXY, {'궤적','목표','최종'}, 'Location','best', 'FontSize',8);
+        legend(ui.axXY, {'track','target','final'}, 'Location','best', 'FontSize',8);
         axis(ui.axXY,'equal'); hold(ui.axXY,'off');
 
         area(ui.axSon, res.t, res.gate, 'FaceColor',[0.72 0.85 0.98], 'EdgeColor','none');
         ylim(ui.axSon, [-0.1 1.1]);
-        title(ui.axSon, sprintf('소나 사용 구간 (%s)', res.gateSrc));
+        title(ui.axSon, sprintf('Sonar valid window (%s)', res.gateSrc));
 
         if res.crashed
             for ax = [ui.axTilt ui.axAlt ui.axSon]
-                xline(ax, res.tHit, ':', '접지', 'Color',[0.80 0.15 0.10], 'LineWidth',1.2);
+                xline(ax, res.tHit, ':', 'ground contact', 'Color',[0.80 0.15 0.10], 'LineWidth',1.2);
             end
         end
 
         lines = {};
         if res.preCrashed
-            lines{end+1} = sprintf(['⚠ 시나리오가 시작되기도 전에(%.2f s) 기체가 이미 지면에 있습니다.\n' ...
-                '  외란과 무관하게 기준 비행 자체가 실패한 상태이므로 아래 지표는\n' ...
-                '  전부 무의미합니다. 제어기/추정기 쪽을 먼저 확인하세요.'], res.tHit);
+            lines{end+1} = sprintf(['[!] The airframe was already on the ground (%.2f s) before the\n' ...
+                '    scenario even started. The baseline flight failed on its own, so every\n' ...
+                '    metric below is meaningless. Check the controller/estimator first.'], res.tHit);
             lines{end+1} = '';
         end
         if strcmp(cfg.mode,'impact')
-            lines{end+1} = sprintf('타격  : J = %.3f N·s,  접촉 %.0f ms,  t = %.1f s', ...
+            lines{end+1} = sprintf('Impact    : J = %.3f N.s,  contact %.0f ms,  t = %.1f s', ...
                 cfg.J, cfg.dur*1000, cfg.t0);
-            lines{end+1} = sprintf('타격점: r = [%.1f, %.1f, %.1f] cm (몸체)', cfg.r*100);
+            lines{end+1} = sprintf('Hit point : r = [%.1f, %.1f, %.1f] cm (body frame)', cfg.r*100);
         else
-            lines{end+1} = sprintf('초기  : 기울기 %.0f°,  방출 고도 %.1f m,  모터 정지 %.2f s', ...
+            lines{end+1} = sprintf('Initial   : tilt %.0f deg,  release %.1f m,  motor hold %.2f s', ...
                 cfg.tilt0, cfg.alt0, cfg.hold);
         end
-        lines{end+1} = sprintf('최대 기울기 : %.1f°', res.maxTilt);
+        lines{end+1} = sprintf('Peak tilt      : %.1f deg', res.maxTilt);
         if isnan(res.settle)
-            lines{end+1} = '자세 회복   : 시간 내 5° 미만 도달 못 함';
+            lines{end+1} = 'Recovery       : never got below 5 deg within the run';
         else
-            lines{end+1} = sprintf('자세 회복   : %.2f 초 (5° 미만)', res.settle);
+            lines{end+1} = sprintf('Recovery       : %.2f s (to below 5 deg)', res.settle);
         end
         if res.crashed
-            lines{end+1} = sprintf('최저 고도   : %.2f m   ← %.2f s 에 지면 접촉', res.minAlt, res.tHit);
+            lines{end+1} = sprintf('Min altitude   : %.2f m   <- ground contact at %.2f s', res.minAlt, res.tHit);
         else
-            lines{end+1} = sprintf('최저 고도   : %.2f m', res.minAlt);
+            lines{end+1} = sprintf('Min altitude   : %.2f m', res.minAlt);
         end
-        lines{end+1} = sprintf('최대 이탈   : 수평 %.3f m (목표점 기준)', res.maxDev);
-        lines{end+1} = sprintf('복귀 오차   : 수평 %.3f m,  고도 %+.3f m,  최종 기울기 %.1f°', ...
+        lines{end+1} = sprintf('Max excursion  : %.3f m horizontal (from target)', res.maxDev);
+        lines{end+1} = sprintf('Final error    : %.3f m horizontal,  %+.3f m altitude,  tilt %.1f deg', ...
             res.errXY, res.errZ, res.endTilt);
-        lines{end+1} = sprintf('소나 사용   : %.0f%% (%s)', res.gateFrac*100, res.gateSrc);
-        lines{end+1} = sprintf('평가 구간   : %.2f ~ %.2f s%s', cfg.evalFrom, res.tEval, ...
-            tern(res.crashed, ' (접지 이후는 지면 미끄러짐이라 제외)', ''));
+        lines{end+1} = sprintf('Sonar duty     : %.0f%% (%s)', res.gateFrac*100, res.gateSrc);
+        lines{end+1} = sprintf('Eval window    : %.2f - %.2f s%s', cfg.evalFrom, res.tEval, ...
+            tern(res.crashed, ' (after contact excluded: it slides along the ground)', ''));
         ui.scoreTxt.Text = strjoin(lines, newline);
 
         if res.success
-            ui.verdict.Text = '성공';
+            ui.verdict.Text = 'SUCCESS';
             ui.verdict.FontColor = [0.05 0.50 0.18];
         else
-            ui.verdict.Text = '실패';
+            ui.verdict.Text = 'FAILURE';
             ui.verdict.FontColor = [0.80 0.15 0.10];
         end
     end

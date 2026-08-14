@@ -81,19 +81,19 @@ keepOnDisk = strcmp(action,'session');   % 세션 한정: 저장하지 않는다
 
 if changed
     if keepOnDisk
-        note = sprintf('%s 는 저장하지 않았습니다 (이 세션에서만 유효).', MDL);
+        note = sprintf('%s was not saved (valid for this session only).', MDL);
     else
         save_system(MDL);
-        note = sprintf('%s 저장했습니다.', MDL);
+        note = sprintf('%s saved.', MDL);
     end
     status = i_survey(NL);
     if verbose
-        fprintf('[restoreScenarioHooks] %s 완료 — %s\n', action, note);
+        fprintf('[restoreScenarioHooks] %s done - %s\n', action, note);
         i_report(status);
     end
 else
     if verbose
-        fprintf('[restoreScenarioHooks] 바꿀 것이 없습니다 (이미 %s 상태).\n', action);
+        fprintf('[restoreScenarioHooks] nothing to change (already in the ''%s'' state).\n', action);
         i_report(status);
     end
 end
@@ -126,19 +126,19 @@ tf = strcmp(get_param(path,'BlockType'), 'DigitalClock');
 end
 
 function i_report(s)
-fprintf('  ① 타격 (ImpactGen/ImpactClock)        : %s\n', i_yn(s.impact));
-fprintf('  ② 모터 정지 (MotorGate 4종)           : %s\n', i_yn(s.motorGate));
-fprintf('  ③ 초기 자세 (SO3_dynamics init_* 인자): %s\n', i_yn(s.initState));
-fprintf('  ④ ImpactClock 이 이산(Digital, Ts)    : %s\n', i_yn(s.clock));
+fprintf('  (1) impact  (ImpactGen/ImpactClock)         : %s\n', i_yn(s.impact));
+fprintf('  (2) motor gate (MotorGate, 4 blocks)       : %s\n', i_yn(s.motorGate));
+fprintf('  (3) initial attitude (SO3_dynamics init_*) : %s\n', i_yn(s.initState));
+fprintf('  (4) ImpactClock is discrete (Digital, Ts)  : %s\n', i_yn(s.clock));
 if s.allReady
-    fprintf('  => flipScenarioUI 를 그대로 실행하면 됩니다.\n');
+    fprintf('  => flipScenarioUI is ready to run as is.\n');
 else
-    fprintf('  => restoreScenarioHooks(''apply'') 를 실행하세요.\n');
+    fprintf('  => run restoreScenarioHooks(''apply'').\n');
 end
 end
 
 function s = i_yn(tf)
-if tf, s = '있음'; else, s = '없음'; end
+if tf, s = 'present'; else, s = 'MISSING'; end
 end
 
 function tf = i_has(path)
@@ -286,7 +286,7 @@ end
 function i_patchPlant(NL, toParameterized)
 ch = sfroot().find('-isa','Stateflow.EMChart','Path',[NL '/MATLAB Function']);
 if isempty(ch)
-    error('restoreScenarioHooks:noPlant', '%s/MATLAB Function 을 찾지 못했습니다.', NL);
+    error('restoreScenarioHooks:noPlant', 'Could not find %s/MATLAB Function.', NL);
 end
 ch = ch(1);
 
@@ -305,8 +305,8 @@ for k = 1:size(pairs,1)
     n = numel(strfind(src, pairs{k,from}));
     if n ~= 1
         error('restoreScenarioHooks:ambiguousPatch', ...
-            ['SO3_dynamics 에서 "%s" 가 %d 번 나옵니다 (1번이어야 함).\n' ...
-             '플랜트 코드가 그 사이에 바뀐 것 같습니다. 수동으로 확인하세요.'], ...
+            ['"%s" occurs %d times in SO3_dynamics (expected exactly 1).\n' ...
+             'The plant code appears to have changed since. Check it by hand.'], ...
             pairs{k,from}, n);
     end
     src = strrep(src, pairs{k,from}, pairs{k,to});
