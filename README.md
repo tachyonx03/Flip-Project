@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/mambo_sim.png" alt="Parrot Mambo simulation" width="640">
+  <img src="https://raw.githubusercontent.com/tachyonx03/Flip-Project/main/docs/mambo_sim.png" alt="Parrot Mambo simulation" width="640">
 </p>
 
 Past 90° of tilt the available torque can no longer pull the vehicle back, so instead of fighting
@@ -51,7 +51,7 @@ no block diagram editing, no `set_param`. This is the intended entry point for a
 to *use* the controller rather than modify it.
 
 <p align="center">
-  <img src="docs/scenario_ui.png" alt="Flip Scenarios UI" width="900">
+  <img src="https://raw.githubusercontent.com/tachyonx03/Flip-Project/main/docs/scenario_ui.png" alt="Flip Scenarios UI" width="900">
 </p>
 
 **Two scenarios, one screen:**
