@@ -4,9 +4,7 @@
   <b>Attitude recovery of a quadcopter hit by a sharp torque disturbance.</b>
 </p>
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/tachyonx03/Flip-Project/main/docs/mambo_sim.png" alt="Parrot Mambo simulation" width="640">
-</p>
+![Parrot Mambo simulation](docs/mambo_sim.png)
 
 Past 90° of tilt the available torque can no longer pull the vehicle back, so instead of fighting
 the tumble the controller **carries it through a full 360° flip on its own momentum** and then
@@ -50,9 +48,7 @@ A single window that lets you throw a disturbance at the vehicle, fly it, and re
 no block diagram editing, no `set_param`. This is the intended entry point for anyone who wants
 to *use* the controller rather than modify it.
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/tachyonx03/Flip-Project/main/docs/scenario_ui.png" alt="Flip Scenarios UI" width="900">
-</p>
+![Flip Scenarios UI](docs/scenario_ui.png)
 
 **Two scenarios, one screen:**
 
