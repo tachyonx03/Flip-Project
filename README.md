@@ -4,8 +4,6 @@
   <b>Attitude recovery of a quadcopter hit by a sharp torque disturbance.</b>
 </p>
 
-![Parrot Mambo simulation](docs/mambo_sim.png)
-
 Past 90° of tilt the available torque can no longer pull the vehicle back, so instead of fighting
 the tumble the controller **carries it through a full 360° flip on its own momentum** and then
 re-stabilizes. A closed-form momentum criterion decides which of the two to do, and the whole loop
@@ -47,8 +45,6 @@ To fly one plain simulation without the UI, replace the last line with `sim('asb
 A single window that lets you throw a disturbance at the vehicle, fly it, and read the outcome —
 no block diagram editing, no `set_param`. This is the intended entry point for anyone who wants
 to *use* the controller rather than modify it.
-
-![Flip Scenarios UI](docs/scenario_ui.png)
 
 **Two scenarios, one screen:**
 
