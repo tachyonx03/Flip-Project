@@ -6,14 +6,13 @@
 
 Past 90° of tilt the available torque can no longer pull the vehicle back, so instead of fighting
 the tumble the controller **carries it through a full 360° flip on its own momentum** and then
-re-stabilizes. A closed-form momentum criterion decides which of the two to do, and the whole loop
-runs on estimated state only — no ground truth, no motion capture.
+re-stabilizes. Which of the two happens is settled by the physics rather than by a planner, and
+the whole loop runs on estimated state only — no ground truth, no motion capture.
 
 [Quick Start](#quick-start) ·
 [Usage](#usage) ·
 [How It Works](#how-it-works) ·
 [Layout](#repository-layout) ·
-[Limitations](#known-limitations--roadmap) ·
 [References](#references)
 
 ---
@@ -173,34 +172,25 @@ against the remaining tilt. Below a certain rate that is impossible within $a_{\
 controller commands full torque, does not win, and the vehicle ends up in a slow uncontrolled
 tumble. Finishing the rotation is cheaper than reversing it.
 
-### The criterion
+### The state machine
 
-Integrating $\dot\omega = -a_{\max}$ from tilt $\theta$ to the inverted point $\pi$ gives the
-minimum rate that still completes the rotation:
-
-$$\omega_{\mathrm{crit}}(\theta) = \sqrt{2\,a_{\max}\,(\pi - \theta)}$$
-
-At $\theta = 90°$ this evaluates to **35.18 rad/s**. The flip mode is entered and left by a
-two-condition state machine:
+Flip mode is a latch with hysteresis. It does not touch the control law — it only pins the
+attitude target to level (`R_des = I`) and drops the yaw error term:
 
 | | Condition |
 |---|---|
-| **Enter flip** | `R33 < 0`  ∥  `w_tilt > ω_crit(θ)` |
+| **Enter flip** | `R33 < 0` (tilt past 90°) |
 | **Exit flip** | `R33 > 0.707` (45°)  &&  `w_tilt < τ_max/kW ≈ 4.7` |
 
-Predicted vs. observed flip-through was **6/6** on the single-axis sweep.
-
-> [!IMPORTANT]
-> $\omega_{\mathrm{crit}}$ is a **planar (single-axis)** result. It does not carry over to
-> diagonal disturbances or fully 3-D tumbles, where the gyroscopic term $\omega \times J\omega$
-> is no longer zero. Extending the criterion to 3-D is an open item.
+The exit rate threshold is the point at which the derivative term stops saturating the available
+torque, i.e. where the controller is back in its linear region.
 
 ### A physical collision
 
-Note that the flip threshold, 35.18 rad/s, sits **above** the gyro full scale of 34.907 rad/s
-(2000 dps). Any flip that actually completes therefore saturates the rate gyro by construction —
-the saturation is not a tuning problem, it is unavoidable on this hardware. The angle lost while
-the measurement is clipped is approximately
+The body rates a completed flip actually reaches sit far **above** the gyro full scale of
+34.907 rad/s (2000 dps). Any flip that completes therefore saturates the rate gyro by
+construction — the saturation is not a tuning problem, it is unavoidable on this hardware. The
+angle lost while the measurement is clipped is approximately
 
 $$\Delta\theta_{\mathrm{lost}} \approx \frac{(\omega_0 - \mathrm{FS})^2}{2\,a_{\max}}$$
 
@@ -245,35 +235,9 @@ Flip3DOF/                          planar 3-DOF sandbox used to size the gains
 └── motorSat.m                     motor saturation model
 ```
 
-`Flip3DOF/` is the reduced planar model the criterion and the initial gains were derived on. It
-has no estimator and no roll/yaw coupling — it exists to make the physics checkable by hand
-before touching the full Simulink loop.
-
-## Known Limitations & Roadmap
-
-- [x] Remove all ground-truth injection ("cheats") from the control path
-- [x] Establish the real-gyro baseline and quantify the saturation share (70 %)
-- [x] Backward reconstruction across the saturated window (`A` 0.13 → 0.28)
-- [ ] Close the remaining estimator gap above `A = 0.30`
-- [ ] The `A ≈ 0.14–0.20` hole — fails even with an ideal gyro
-- [ ] Break the altitude feedback loop: saturation → tilt error → sonar tilt-compensation →
-      altitude → thrust → tilt error again. Recovery time constant degrades 3.17 s → 64.58 s
-      when altitude comes from the estimator rather than truth
-- [ ] Gate optical flow during flips — it reads 141 against a true 0.01 while inverted
-- [ ] Re-run the diagonal sweep with cheats removed (only the single axis has been re-measured)
-- [ ] Extend $\omega_{\mathrm{crit}}$ to 3-D, where $|\omega \times J\omega| = 0.041$ N·m already
-      exceeds $\tau_{\max} = 0.023$ N·m at $\omega_0 = [40\ 30\ 20]$
-
-Rejected after analysis, kept here so they don't get re-proposed:
-
-| Idea | Why not |
-|---|---|
-| Barometer / optical flow to cover saturation | The saturated window is 0.070 s ≈ 14 Hz; both sensors are band-limited to a few Hz |
-| Differentiate sonar to get tilt | $\dot h$ and $\dot\theta$ are not separable, and the target leaves the beam cone |
-| Switch to an EKF for saturation | Saturation is a *bias*, not extra noise — no covariance tuning recovers it. Still useful for the recovery time constant |
-
-A Tobit Kalman filter, which treats a saturated sample as a *censored* measurement rather than a
-wrong one, is the principled long-term fix and remains on the list.
+`Flip3DOF/` is the reduced planar model the initial gains were derived on. It has no estimator
+and no roll/yaw coupling — it exists to make the physics checkable by hand before touching the
+full Simulink loop.
 
 ## References
 
